@@ -1,21 +1,59 @@
-& {
- $wid=[System.Security.Principal.WindowsIdentity]::GetCurrent()
- $prp=new-object System.Security.Principal.WindowsPrincipal($wid)
- $adm=[System.Security.Principal.WindowsBuiltInRole]::Administrator
- $IsAdmin=$prp.IsInRole($adm)
- if (-not $IsAdmin)
- {
-    write-host "You must run this script in an elevated shell!"
+# Check if shell is elevated
+$IsAdmin = [bool](([System.Security.Principal.WindowsIdentity]::GetCurrent()).groups -match "S-1-5-32-544")
+
+if (!$IsAdmin) {
+    Read-Host "This script must be run from an elevated shell"
     exit
- }
 }
 
-$programs = "7zip.install", "waterfox", "putty.install", "winscp.install", "sublimetext3", "nodejs.install", "sysinternals", "atom", "gitkraken", "vagrant", "docker-for-windows"
+# Check if chocolatey is already installed
 
-write-host "Installing chocolatey..."
-Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
-write-host "Chocolatey installed!"
+try {
+    get-packageprovider -name "Chocolatey" | out-null
+}catch{
+    # Attempt to download chocolatey
+    Write-Host "Downloading Chocolatey..."
 
-$installString = $programs -join " "
+    try {
+        Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1')) -ErrorAction Stop
+    }catch {
+        Write-Host $_.Exception.Message
+        Read-Host "Encountered an error while downloading Chocolatey, exiting..."
+        exit
+    }
+}
 
-echo y | choco install -y $installString
+
+# Once installed, attempt to download and install packages
+$packages = @("7zip","vlc", "sublimetext3", "putty.install", "winscp.install", "atom", "sysinternals", "nodejs.install", "virtualbox", "vagrant", "waterfox", "enpass.install", "discord")
+
+Write-Host "Downloading packages..."
+Write-Host "Packages: $packages"
+
+$results = @{}
+$packages | ForEach { 
+    try{
+        choco install -y $_
+        $results.Add($_, $True)
+    }catch {
+        $results.Add($_, $False)
+    }
+}
+
+write-host "Package installations finished!"
+
+# get the packages that failed, if at all
+$failures = @()
+$results.Keys | foreach-object {if ($results[$_] -eq $False) {
+    $failures += $_      
+}}
+
+
+write-host "Packages installation status: $results"
+
+if ($failures.length -gt 0) {
+    write-host "Installation of the following packages failed: $failures"
+    write-host "You might want to attempt manual installation of these packages."
+}
+
+write-host "Done!"

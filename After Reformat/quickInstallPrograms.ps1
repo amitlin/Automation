@@ -9,7 +9,7 @@ if (!$IsAdmin) {
 # Check if chocolatey is already installed
 
 try {
-    get-packageprovider -name "Chocolatey" | out-null
+    choco | out-null
 }catch{
     # Attempt to download chocolatey
     Write-Host "Downloading Chocolatey..."
